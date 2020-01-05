@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>crazy draw</title>
+		<script src="./build/three.js"></script>
+		<script src="js/loaders/MTLLoader.js"></script>
+		<script src="js/loaders/OBJLoader.js"></script>
+		<script src="js/controls/OrbitControls.js"></script>
+		<style>
+			*{
+				margin: 0;
+				padding: 0;
+			}
+		</style>
+	</head>
+	<body style="overflow: hidden;">
+		
+		
+		<script>
+			var camera, scene, renderer;//相机 场景 渲染器
+			var attractor;//线对象  光
+
+			var speed = 200; // 渲染速度
+			var scale = 0.1;//放大比例
+			var current = 1;//填充点索引
+			var arryAll = []//数据点   拓展：一条线由无数个数据点构成
+
+			
+			var isRun = true //渲染完毕的开关
+
+		
+			function draw() {
+
+				var geometry = attractor.geometry;//线的几何网格对象  用于存储顶点位置，面，颜色等
+
+				if ( current < arryAll.length-3 ) {//每次是填充3个值，所以终止长度-3
+
+					current ++;
+
+				} else {
+					isRun = false//渲染完毕
+					current = 0; 
+
+				}
+				
+				if ( current < arryAll.length ) {
+					//数据点里面依次拿取   x,y,z,...,x,y,z...,x,y,z
+					var dx = arryAll[current]
+					var dy = arryAll[current + 1]
+					var dz = arryAll[current + 2]
+
+				
+					geometry.attributes.position.set( [  dx, dy,  dz ], current );//不断往顶点里面添加点 ，从而形成渲染动画
+					
+					
+//					float32Array.set(index, value);
+//					float32Array.set(array, offset);
+//					ndex
+//					要设置的位置的索引。
+//					
+//					value
+//					要设置的值。
+//					
+//					array
+//					要设置的值的类型化或非类型化数组。
+//					
+//					offset
+//					要写入的值在当前数组中的位置的索引。
+
+				}
+
+			}
+
+			 function init() {
+
+				scene = new THREE.Scene();//场景
+
+				camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 0.01, 100000 );//设置相机
+				camera.position.set(0,110,0)//俯视视角
+				//
+		
+				controls = new THREE.OrbitControls(camera); //添加控制器
+
+				controls.update();
+				
+				var light = new THREE.DirectionalLight(0xffffff);//平行光,类似于太阳光
+				light.position.set(0, 200, 100);
+				light.castShadow = true;//投射动态阴影,默认false,比较耗性能
+				
+				light.shadow.camera.top = 180;//从光线的角度来看其他物体背后的物体将处于阴影之中（计算内部阴影）,平行光是平行的所以 相机为OrthographicCamera相机
+				light.shadow.camera.bottom = -100;
+				light.shadow.camera.left = -120;
+				light.shadow.camera.right = 120;
+				light.shadow.mapSize.width = 4096; // default
+				light.shadow.mapSize.height = 4096; // default
+				scene.add(light);
+				var geometry = new THREE.BufferGeometry();//网格对象
+				
+				var positions = new Float32Array( arryAll.length );//顶点数组
+
+
+				geometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );//设置网格对象里面的顶点数据
+
+				var colors = new Float32Array( arryAll.length );//颜色数组
+
+				for ( var i = 0; i < positions.length; i += 3 ) {
+					//r,g,b 值为0-1
+					var r = 1/positions.length*(positions.length-i)//红色起始渐变,
+					var g = .3/positions.length*i//绿色值终点渐变
+					var b = 0.23//0.23的蓝色值
+//					var b = 1/positions.length*i*Math.sin(Math.PI/180*i)//扩展：意想不到的sin颜色效果
+					colors.set( [r,g,b], i );//set方法见57-69代码行
+					
+				}
+				
+				geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );//设置网格对象里面的颜色数据
+				
+				var material = new THREE.LineBasicMaterial( { vertexColors: THREE.VertexColors } );//使用顶点着色方式着色
+
+				attractor = new THREE.Line( geometry, material );//创建线对象
+				attractor.position.set( 0, 0, 0 );//设置左边位置
+				attractor.frustumCulled = false; // 节约性能，减少检查
+				attractor.scale.set(scale,scale,scale)//设置放大比例
+				scene.add( attractor );//放入场景
+			
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setClearColor(0xF5F5DC)
+				renderer.shadowMap.enabled = true;//渲染器接收阴影渲染
+				document.body.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize, false );//窗口大小变化后，针对当前窗口大小比例渲染
+				
+				
+				
+				 
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;//相机视锥体的长宽比
+				camera.updateProjectionMatrix();//更新相机投影矩阵
+
+				renderer.setSize( window.innerWidth, window.innerHeight );//渲染器大小
+
+
+			}
+
+			function animate() {
+
+				renderer.setAnimationLoop( render );
+
+			}
+
+			function render() {
+
+				for ( var i = 0; i < speed; i ++ ) {
+					if(isRun) draw()
+				}
+
+				attractor.geometry.attributes.position.needsUpdate = true;//允许顶点更新
+				attractor.geometry.attributes.color.needsUpdate = true;//允许颜色更新
+//				attractor.rotation.y += .001;//旋转
+//				scene.getObjectByName('build').rotation.y += .001;//几何模型
+
+				renderer.render( scene, camera );
+
+			}
+			loadModle2('./tank/','head.obj',arryAll)
+			
+			function loadModle2(url,name,array) {
+				var onProgress = function(xhr) {
+					if(xhr.lengthComputable) {
+						var percentComplete = xhr.loaded / xhr.total * 100;
+						console.log(Math.round(percentComplete, 2) + '% downloaded');//监听模型加载进度
+					}
+				};
+
+				var onError = function(xhr) {};//模型加载错误监听
+
+				var mtlLoader = new THREE.MTLLoader();//材质加载器
+				mtlLoader.setPath('./tank/');//加载路径
+				mtlLoader.load('tank.mtl', function(materials) {//加载材质文件
+
+					materials.preload();//材质渲染
+
+					var objLoader = new THREE.OBJLoader();//obj格式文件加载器
+					//
+					objLoader.setMaterials(materials);//使用材质
+					objLoader.setPath(url);//obj加载路径
+
+					objLoader.load(name, function(object) {
+					
+						object.traverse(function(child) {
+
+							if(child.isMesh) {
+
+								child.castShadow = true;
+
+								child.receiveShadow = true;
+								child.scale.set( scale, scale, scale );
+								child.material = new THREE.MeshLambertMaterial({//对模型的每个子对象进行材质处理，视情况而定，我这需要处理为自定义材质
+								
+									transparent:true,//允许透明
+									opacity:0.6,//透明度,
+									depthTest:true,
+									color:0xB0C4DE
+									
+								})
+								
+							var model = child.geometry;
+							var Aces = model.attributes.position.array
+							var geometry = new THREE.Geometry()
+							
+							for(var i = 0; i < Aces.length + 3; i += 3) {
+								var vec = new THREE.Vector3(Aces[i], Aces[i + 1], Aces[i + 2])
+
+									//将坐标点一一放入到数组里面去
+									array.push(Aces[i])
+									array.push(Aces[i+1])
+									array.push(Aces[i+2])
+							}
+								
+							}
+
+						}); 
+
+
+						init();
+						animate();
+						object.name = 'build'
+						scene.add(object)//处理后的模型放入组对象
+					}, onProgress, onError);
+
+				});
+			}
+			
+	
+		</script>
+	</body>
+</html>
